@@ -13,6 +13,7 @@ use SifrBolt\Lite\Features\TransientsJanitor;
 
 final class AdminUi
 {
+
     public function __construct(
         private readonly AutoloadInspector $autoload_inspector,
         private readonly TransientsJanitor $transients_janitor,
@@ -24,6 +25,33 @@ final class AdminUi
     }
 
     private string $version = '0.0.0';
+
+    /**
+     * Canonical upgrade consoles mapped to the tier keys.
+     */
+    private function upgrade_consoles(): array
+    {
+        return [
+            [
+                'key' => 'surge',
+                'title' => __('Surge', 'sifrbolt'),
+                'description' => __('Edge-accelerated caching and CDN orchestration for scale.', 'sifrbolt'),
+                'url' => 'https://console.sifrbolt.com/surge',
+            ],
+            [
+                'key' => 'storm',
+                'title' => __('Storm', 'sifrbolt'),
+                'description' => __('Automation suite for flash sales, bursts, and traffic spikes.', 'sifrbolt'),
+                'url' => 'https://console.sifrbolt.com/storm',
+            ],
+            [
+                'key' => 'citadel',
+                'title' => __('Citadel', 'sifrbolt'),
+                'description' => __('Enterprise-grade resilience, isolation, and compliance tooling.', 'sifrbolt'),
+                'url' => 'https://console.sifrbolt.com/citadel',
+            ],
+        ];
+    }
 
     public function register(string $version): void
     {
@@ -37,7 +65,7 @@ final class AdminUi
     {
         add_menu_page(
             __('Command Deck', 'sifrbolt'),
-            __('SifrBolt Spark', 'sifrbolt'),
+            __('SifrBolt — Spark', 'sifrbolt'),
             'manage_options',
             'sifrbolt-command-deck',
             [$this, 'render_command_deck'],
@@ -64,31 +92,14 @@ final class AdminUi
         if (! current_user_can('manage_options')) {
             return;
         }
-
-        $cards = [
-            [
-                'title' => __('Surge', 'sifrbolt'),
-                'description' => __('Edge-accelerated caching and CDN orchestration for scale.', 'sifrbolt'),
-                'url' => 'https://console.sifrbolt.com/surge',
-            ],
-            [
-                'title' => __('Storm', 'sifrbolt'),
-                'description' => __('Automation suite for flash sales, bursts, and traffic spikes.', 'sifrbolt'),
-                'url' => 'https://console.sifrbolt.com/storm',
-            ],
-            [
-                'title' => __('Citadel', 'sifrbolt'),
-                'description' => __('Enterprise-grade resilience, isolation, and compliance tooling.', 'sifrbolt'),
-                'url' => 'https://console.sifrbolt.com/citadel',
-            ],
-        ];
         ?>
         <div class="wrap sifrbolt-command-deck">
-            <h1><?php esc_html_e('SifrBolt — Spark (Lite) Command Deck', 'sifrbolt'); ?></h1>
+            <h1><?php esc_html_e('SifrBolt — Spark Command Deck', 'sifrbolt'); ?></h1>
             <p><?php echo esc_html(sprintf(__('Version %s ready on deck. Choose a console to deploy deeper capabilities.', 'sifrbolt'), $this->version)); ?></p>
+            <p style="opacity:0.75;">Spark → Surge → Storm → Citadel</p>
             <div class="sifrbolt-upgrade-grid" style="display:flex;gap:16px;flex-wrap:wrap;">
-                <?php foreach ($cards as $card) : ?>
-                    <div style="background:#fff;border:1px solid #ccd0d4;border-radius:8px;padding:16px;flex:1 1 200px;">
+                <?php foreach ($this->upgrade_consoles() as $card) : ?>
+                    <div data-tier="<?php echo esc_attr($card['key']); ?>" style="background:#fff;border:1px solid #ccd0d4;border-radius:8px;padding:16px;flex:1 1 200px;">
                         <h2><?php echo esc_html($card['title']); ?></h2>
                         <p><?php echo esc_html($card['description']); ?></p>
                         <a class="button button-primary" href="<?php echo esc_url($card['url']); ?>" target="_blank" rel="noopener noreferrer">

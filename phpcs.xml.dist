@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
-<ruleset name="SifrBolt Spark Lite">
-    <description>PHPCS baseline for the SifrBolt — Spark (Lite) plugin.</description>
+<ruleset name="SifrBolt Spark">
+    <description>PHPCS baseline for the SifrBolt — Spark plugin.</description>
     <file>./</file>
     <exclude-pattern>vendor/</exclude-pattern>
     <exclude-pattern>node_modules/</exclude-pattern>

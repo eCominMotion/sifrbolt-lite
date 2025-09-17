@@ -80,7 +80,7 @@ final class CronManager
 <?php
 /**
  * Plugin Name: SifrBolt Cron Bridge
- * Description: Managed by SifrBolt — Spark (Lite) to control WP-Cron.
+ * Description: Managed by SifrBolt — Spark to control WP-Cron.
  */
 if (! defined('DISABLE_WP_CRON')) {
     define('DISABLE_WP_CRON', true);

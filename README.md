@@ -1,4 +1,4 @@
-# SifrBolt — Spark (Lite)
+# SifrBolt — Spark
 
 A lightweight WordPress command deck exposing core SifrBolt operational tooling:
 
@@ -6,7 +6,7 @@ A lightweight WordPress command deck exposing core SifrBolt operational tooling:
 - Autoload Inspector to review heavy `autoload=yes` options, adjust flags, and backup/restore snapshots.
 - Transients Janitor scheduled weekly clean using WordPress APIs.
 - Cron Manager to toggle `DISABLE_WP_CRON` through an MU-plugin with guidance for real cron.
-- Redis capability hints with upgrade paths to SifrBolt Surge, Storm, and Citadel.
+- Redis capability hints with upgrade paths to SifrBolt — Surge Pack, SifrBolt — Storm, and SifrBolt — Citadel.
 - Telemetry controls (off by default) that send aggregated CWV buckets only when enabled.
 
 ## Requirements

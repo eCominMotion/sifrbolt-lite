@@ -1,6 +1,6 @@
 <?php
 /**
- * SifrBolt Spark Lite advanced cache drop-in.
+ * SifrBolt — Spark advanced cache drop-in.
  * Signature: SIFRBOLT_SPARK_LITE_DROPIN v1
  */
 

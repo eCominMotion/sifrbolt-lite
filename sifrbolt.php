@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: SifrBolt — Spark (Lite)
+ * Plugin Name: SifrBolt — Spark
  * Plugin URI: https://sifrbolt.com
- * Description: WordPress command deck for SifrBolt Spark (Lite) features.
+ * Description: WordPress command deck for SifrBolt — Spark features.
  * Version: 0.1.0
  * Author: SifrBolt
  * Author URI: https://sifrbolt.com
