@@ -24,9 +24,25 @@ final class LicenseFeatureResolver {
 	 */
 	private const FALLBACK_FEATURES = array(
 		'spark'   => array(),
-		'surge'   => array( 'autoload_inspector_write' ),
-		'storm'   => array( 'autoload_inspector_write' ),
-		'citadel' => array( 'autoload_inspector_write' ),
+		'surge'   => array(
+			'autoload_inspector_write',
+			'js_scheduler',
+			'image_iq',
+		),
+		'storm'   => array(
+			'autoload_inspector_write',
+			'js_scheduler',
+			'image_iq',
+			'index_pack',
+			'redis_advanced',
+		),
+		'citadel' => array(
+			'autoload_inspector_write',
+			'js_scheduler',
+			'image_iq',
+			'index_pack',
+			'redis_advanced',
+		),
 	);
 
 	/**
