@@ -1,24 +1,40 @@
 <?php
+/**
+ * Redis advisor helpers.
+ *
+ * @package SifrBolt
+ */
 
 declare(strict_types=1);
 
 namespace SifrBolt\Lite\Features;
 
-final class RedisAdvisor
-{
-    public function detect(): array
-    {
-        $extension = extension_loaded('redis') || class_exists('\\Redis');
-        $dropin = defined('WP_REDIS_PLUGIN_VERSION') || file_exists(WP_CONTENT_DIR . '/object-cache.php');
+/**
+ * Provides guidance about Redis availability.
+ */
+final class RedisAdvisor {
 
-        return [
-            'extension' => $extension,
-            'dropin' => $dropin,
-        ];
-    }
+	/**
+	 * Detects Redis integration status.
+	 *
+	 * @return array<string, bool>
+	 */
+	public function detect(): array {
+		$extension = extension_loaded( 'redis' ) || class_exists( '\\Redis' );
+		$dropin    = defined( 'WP_REDIS_PLUGIN_VERSION' ) || file_exists( WP_CONTENT_DIR . '/object-cache.php' );
 
-    public function get_recommendation_url(): string
-    {
-        return 'https://wordpress.org/plugins/redis-cache/';
-    }
+		return array(
+			'extension' => $extension,
+			'dropin'    => $dropin,
+		);
+	}
+
+	/**
+	 * Returns the recommended plugin link.
+	 *
+	 * @return string
+	 */
+	public function get_recommendation_url(): string {
+		return 'https://wordpress.org/plugins/redis-cache/';
+	}
 }

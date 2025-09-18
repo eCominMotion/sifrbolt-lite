@@ -1,4 +1,9 @@
 <?php
+/**
+ * Autoload inspector read operations.
+ *
+ * @package SifrBolt
+ */
 
 declare(strict_types=1);
 
@@ -6,143 +11,198 @@ namespace SifrBolt\Lite\Features;
 
 use wpdb;
 
-final class AutoloadInspectorReader
-{
-    public const NONCE_ACTION = 'sifrbolt_autoload_action';
+/**
+ * Provides read-only insights into autoloaded options.
+ */
+final class AutoloadInspectorReader {
 
-    public function get_top_autoloads(int $limit = 20): array
-    {
-        global $wpdb;
-        if (! $wpdb instanceof wpdb) {
-            return [];
-        }
+	public const NONCE_ACTION = 'sifrbolt_autoload_action';
 
-        $limit = max(1, $limit);
-        $table = $wpdb->options;
-        $query = $wpdb->prepare(
-            "SELECT option_name, LENGTH(option_value) AS size_bytes, autoload FROM {$table} WHERE autoload = 'yes' ORDER BY size_bytes DESC LIMIT %d",
-            $limit
-        );
+	/**
+	 * Retrieves the heaviest autoloaded options.
+	 *
+	 * @param int $limit Number of entries to fetch.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	public function get_top_autoloads( int $limit = 20 ): array {
+		global $wpdb;
+		if ( ! $wpdb instanceof wpdb ) {
+			return array();
+		}
 
-        /** @var array<int,array<string,mixed>> $results */
-        $results = $wpdb->get_results($query, ARRAY_A) ?: [];
-        return array_map(static function (array $row): array {
-            return [
-                'name' => $row['option_name'],
-                'size' => (int) $row['size_bytes'],
-                'autoload' => $row['autoload'],
-            ];
-        }, $results);
-    }
+		$limit = max( 1, $limit );
 
-    public function get_total_autoload_bytes(): int
-    {
-        global $wpdb;
-        if (! $wpdb instanceof wpdb) {
-            return 0;
-        }
+		/**
+		 * Query results.
+		 *
+		 * @var array<int, array<string, mixed>> $results
+		 */
+		$results = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT option_name, LENGTH(option_value) AS size_bytes, autoload FROM {$wpdb->options} WHERE autoload = %s ORDER BY size_bytes DESC LIMIT %d",
+				'yes',
+				$limit
+			),
+			ARRAY_A
+		);
+		if ( ! is_array( $results ) ) {
+			$results = array();
+		}
+		return array_map(
+			static function ( array $row ): array {
+				return array(
+					'name'     => $row['option_name'],
+					'size'     => (int) $row['size_bytes'],
+					'autoload' => $row['autoload'],
+				);
+			},
+			$results
+		);
+	}
 
-        $table = $wpdb->options;
-        $query = "SELECT SUM(LENGTH(option_value)) FROM {$table} WHERE autoload = 'yes'";
-        return (int) $wpdb->get_var($query);
-    }
+	/**
+	 * Calculates total autoload footprint in bytes.
+	 *
+	 * @return int
+	 */
+	public function get_total_autoload_bytes(): int {
+		global $wpdb;
+		if ( ! $wpdb instanceof wpdb ) {
+			return 0;
+		}
 
-    public function handle_post(): void
-    {
-        if (! current_user_can('manage_options')) {
-            return;
-        }
+		return (int) $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT SUM(LENGTH(option_value)) FROM {$wpdb->options} WHERE autoload = %s",
+				'yes'
+			)
+		);
+	}
 
-        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
-            return;
-        }
+	/**
+	 * Handles import/export requests from admin screens.
+	 *
+	 * @return void
+	 */
+	public function handle_post(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
 
-        $action = sanitize_text_field($_POST['sifrbolt_autoload_action'] ?? '');
-        if ($action === '') {
-            return;
-        }
+		$request_method = isset( $_SERVER['REQUEST_METHOD'] ) ? (string) $_SERVER['REQUEST_METHOD'] : '';
+		if ( 'POST' !== $request_method ) {
+			return;
+		}
 
-        if (! in_array($action, ['export', 'import'], true)) {
-            return;
-        }
+		$action = sanitize_text_field( $_POST['sifrbolt_autoload_action'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified via check_admin_referer().
+		if ( '' === $action ) {
+			return;
+		}
 
-        check_admin_referer(self::NONCE_ACTION);
+		if ( ! in_array( $action, array( 'export', 'import' ), true ) ) {
+			return;
+		}
 
-        if ($action === 'export') {
-            $this->stream_backup();
-            return;
-        }
+		check_admin_referer( self::NONCE_ACTION );
 
-        $payload = wp_unslash($_POST['autoload_payload'] ?? '');
-        $this->restore_from_json($payload);
-    }
+		if ( 'export' === $action ) {
+			$this->stream_backup();
+			return;
+		}
 
-    private function stream_backup(): void
-    {
-        $json = $this->generate_backup_json();
-        nocache_headers();
-        header('Content-Type: application/json');
-        header('Content-Disposition: attachment; filename="sifrbolt-autoload-backup.json"');
-        echo $json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
-        exit;
-    }
+		$payload = wp_unslash( $_POST['autoload_payload'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Verified via check_admin_referer().
+		$this->restore_from_json( $payload );
+	}
 
-    private function generate_backup_json(): string
-    {
-        global $wpdb;
-        if (! $wpdb instanceof wpdb) {
-            return wp_json_encode([]);
-        }
+	/**
+	 * Streams the current autoload snapshot as JSON.
+	 *
+	 * @return void
+	 */
+	private function stream_backup(): void {
+		$json = $this->generate_backup_json();
+		nocache_headers();
+		header( 'Content-Type: application/json' );
+		header( 'Content-Disposition: attachment; filename="sifrbolt-autoload-backup.json"' );
+		echo $json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		exit;
+	}
 
-        $table = $wpdb->options;
-        $rows = $wpdb->get_results("SELECT option_name, option_value, autoload FROM {$table} WHERE autoload = 'yes'", ARRAY_A) ?: [];
-        $payload = [];
-        foreach ($rows as $row) {
-            $payload[] = [
-                'name' => $row['option_name'],
-                'autoload' => $row['autoload'],
-                'value' => base64_encode((string) $row['option_value']),
-            ];
-        }
+	/**
+	 * Generates the backup JSON payload.
+	 *
+	 * @return string
+	 */
+	private function generate_backup_json(): string {
+		global $wpdb;
+		if ( ! $wpdb instanceof wpdb ) {
+			return wp_json_encode( array() );
+		}
 
-        return wp_json_encode($payload, JSON_PRETTY_PRINT);
-    }
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT option_name, option_value, autoload FROM {$wpdb->options} WHERE autoload = %s",
+				'yes'
+			),
+			ARRAY_A
+		);
+		if ( ! is_array( $rows ) ) {
+			$rows = array();
+		}
+		$payload = array();
+		foreach ( $rows as $row ) {
+			$payload[] = array(
+				'name'     => $row['option_name'],
+				'autoload' => $row['autoload'],
+				'value'    => base64_encode( (string) $row['option_value'] ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Encoding payload to preserve binary data in JSON export.
+			);
+		}
 
-    private function restore_from_json(string $json): void
-    {
-        $decoded = json_decode($json, true);
-        if (! is_array($decoded)) {
-            add_settings_error('sifrbolt-autoload', 'autoload-import-invalid', __('Invalid JSON payload.', 'sifrbolt'), 'error');
-            return;
-        }
+		return wp_json_encode( $payload, JSON_PRETTY_PRINT );
+	}
 
-        $imported = 0;
-        foreach ($decoded as $item) {
-            if (! is_array($item)) {
-                continue;
-            }
-            $name = sanitize_text_field($item['name'] ?? '');
-            $raw_value = is_string($item['value'] ?? null) ? base64_decode((string) $item['value'], true) : false;
-            $autoload = ($item['autoload'] ?? 'yes') === 'yes';
+	/**
+	 * Restores autoload flags from JSON snapshot.
+	 *
+	 * @param string $json JSON payload from import.
+	 *
+	 * @return void
+	 */
+	private function restore_from_json( string $json ): void {
+		$decoded = json_decode( $json, true );
+		if ( ! is_array( $decoded ) ) {
+			add_settings_error( 'sifrbolt-autoload', 'autoload-import-invalid', esc_html__( 'Invalid JSON payload.', 'sifrbolt' ), 'error' );
+			return;
+		}
 
-            if ($name === '' || $raw_value === false) {
-                continue;
-            }
+		$imported = 0;
+		foreach ( $decoded as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+			$name      = sanitize_text_field( $item['name'] ?? '' );
+			$raw_value = is_string( $item['value'] ?? null ) ? base64_decode( (string) $item['value'], true ) : false; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Decoding plugin-generated JSON export payload.
+			$autoload  = 'yes' === ( $item['autoload'] ?? 'yes' );
 
-            $value = maybe_unserialize($raw_value);
-            update_option($name, $value, $autoload);
-            ++$imported;
-        }
+			if ( '' === $name || false === $raw_value ) {
+				continue;
+			}
 
-        add_settings_error(
-            'sifrbolt-autoload',
-            'autoload-import-complete',
-            sprintf(
-                /* translators: %d: number of options restored */
-                __('Restored %d autoload options.', 'sifrbolt'),
-                $imported
-            ),
-            'updated'
-        );
-    }
+			$value = maybe_unserialize( $raw_value );
+			update_option( $name, $value, $autoload );
+			++$imported;
+		}
+
+		add_settings_error(
+			'sifrbolt-autoload',
+			'autoload-import-complete',
+			sprintf(
+				/* translators: %d: number of options restored */
+				esc_html__( 'Restored %d autoload options.', 'sifrbolt' ),
+				$imported
+			),
+			'updated'
+		);
+	}
 }

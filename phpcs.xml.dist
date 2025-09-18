@@ -7,6 +7,16 @@
     <rule ref="WordPress-Core" />
     <rule ref="WordPress-Extra" />
     <rule ref="WordPress-Docs" />
+    <rule ref="WordPress.Files.FileName.NotHyphenatedLowercase">
+        <exclude-pattern>./includes/*</exclude-pattern>
+        <exclude-pattern>./includes/*/*</exclude-pattern>
+        <exclude-pattern>./includes/*/*/*</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.Files.FileName.InvalidClassFileName">
+        <exclude-pattern>./includes/*</exclude-pattern>
+        <exclude-pattern>./includes/*/*</exclude-pattern>
+        <exclude-pattern>./includes/*/*/*</exclude-pattern>
+    </rule>
     <config name="minimum_supported_wp_version" value="6.2" />
     <config name="testVersion" value="8.1-" />
 </ruleset>

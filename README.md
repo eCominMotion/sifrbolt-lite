@@ -22,3 +22,4 @@ To lint locally:
 
 1. Install the toolchain with `composer install -d tools/phpcs --no-interaction --no-progress`.
 2. Run `tools/phpcs/vendor/bin/phpcs --standard=plugins/sifrbolt-lite/phpcs.xml.dist plugins/sifrbolt-lite`.
+3. Auto-fix safe sniffs with `tools/phpcs/vendor/bin/phpcbf --standard=plugins/sifrbolt-lite/phpcs.xml.dist plugins/sifrbolt-lite`.
