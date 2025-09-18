@@ -211,6 +211,8 @@ final class AdminUi {
 				<input type="hidden" name="action" value="sifrbolt_calm_toggle" />
 				<input type="submit" class="button button-<?php echo $calm ? 'secondary' : 'primary'; ?>" value="<?php echo $calm ? esc_attr__( 'Disengage CalmSwitch', 'sifrbolt' ) : esc_attr__( 'Engage CalmSwitch', 'sifrbolt' ); ?>" />
 			</form>
+
+			<?php do_action( 'sifrbolt/runway/after_overview' ); ?>
 		</div>
 		<?php
 	}
