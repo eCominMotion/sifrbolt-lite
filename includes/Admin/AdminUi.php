@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace SifrBolt\Lite\Admin;
 
-use SifrBolt\Lite\Features\AutoloadInspector;
+use SifrBolt\Lite\Features\AutoloadInspectorReader;
+use SifrBolt\Lite\Features\AutoloadInspectorWriter;
 use SifrBolt\Lite\Features\CalmSwitch;
 use SifrBolt\Lite\Features\CronManager;
 use SifrBolt\Lite\Features\RedisAdvisor;
@@ -15,7 +16,8 @@ final class AdminUi
 {
 
     public function __construct(
-        private readonly AutoloadInspector $autoload_inspector,
+        private readonly AutoloadInspectorReader $autoload_reader,
+        private readonly AutoloadInspectorWriter $autoload_writer,
         private readonly TransientsJanitor $transients_janitor,
         private readonly CronManager $cron_manager,
         private readonly Telemetry $telemetry,
@@ -170,14 +172,22 @@ final class AdminUi
             return;
         }
 
-        $this->autoload_inspector->handle_post();
-        $top = $this->autoload_inspector->get_top_autoloads();
-        $total_bytes = $this->autoload_inspector->get_total_autoload_bytes();
+        $this->autoload_reader->handle_post();
+        $this->autoload_writer->handle_post();
+
+        $write_enabled = $this->autoload_writer->can_write();
+        $top = $this->autoload_reader->get_top_autoloads();
+        $total_bytes = $this->autoload_reader->get_total_autoload_bytes();
+        $nonce_action = AutoloadInspectorReader::NONCE_ACTION;
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('Citadel Wall — Autoload Inspector', 'sifrbolt'); ?></h1>
             <p><?php esc_html_e('Identify heavy autoloaded options and rebalance memory pressure.', 'sifrbolt'); ?></p>
             <p><?php echo esc_html(sprintf(__('Total autoload footprint: %s KB', 'sifrbolt'), number_format_i18n($total_bytes / 1024, 2))); ?></p>
+
+            <?php if (! $write_enabled) : ?>
+                <p class="description" style="margin-top:1em;margin-bottom:1em;"><?php esc_html_e('Write operations require Surge. Upgrade to change autoload flags directly.', 'sifrbolt'); ?></p>
+            <?php endif; ?>
 
             <table class="widefat striped">
                 <thead>
@@ -195,13 +205,17 @@ final class AdminUi
                         <td><?php echo esc_html(number_format_i18n($row['size'] / 1024, 2)); ?></td>
                         <td><?php echo esc_html($row['autoload']); ?></td>
                         <td>
-                            <form method="post" action="">
-                                <?php wp_nonce_field('sifrbolt_autoload_action'); ?>
-                                <input type="hidden" name="sifrbolt_autoload_action" value="toggle" />
-                                <input type="hidden" name="option_name" value="<?php echo esc_attr($row['name']); ?>" />
-                                <input type="hidden" name="set_autoload" value="<?php echo $row['autoload'] === 'yes' ? 'no' : 'yes'; ?>" />
-                                <input type="submit" class="button" value="<?php echo $row['autoload'] === 'yes' ? esc_attr__('Set to no', 'sifrbolt') : esc_attr__('Set to yes', 'sifrbolt'); ?>" />
-                            </form>
+                            <?php if ($write_enabled) : ?>
+                                <form method="post" action="">
+                                    <?php wp_nonce_field($nonce_action); ?>
+                                    <input type="hidden" name="sifrbolt_autoload_action" value="toggle" />
+                                    <input type="hidden" name="option_name" value="<?php echo esc_attr($row['name']); ?>" />
+                                    <input type="hidden" name="set_autoload" value="<?php echo $row['autoload'] === 'yes' ? 'no' : 'yes'; ?>" />
+                                    <input type="submit" class="button" value="<?php echo $row['autoload'] === 'yes' ? esc_attr__('Set to no', 'sifrbolt') : esc_attr__('Set to yes', 'sifrbolt'); ?>" />
+                                </form>
+                            <?php else : ?>
+                                <span style="opacity:0.65;"><?php esc_html_e('Requires Surge', 'sifrbolt'); ?></span>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -210,13 +224,13 @@ final class AdminUi
 
             <h2><?php esc_html_e('Backup & Restore', 'sifrbolt'); ?></h2>
             <form method="post" action="">
-                <?php wp_nonce_field('sifrbolt_autoload_action'); ?>
+                <?php wp_nonce_field($nonce_action); ?>
                 <input type="hidden" name="sifrbolt_autoload_action" value="export" />
                 <p><input type="submit" class="button" value="<?php esc_attr_e('Download Autoload Snapshot', 'sifrbolt'); ?>" /></p>
             </form>
 
             <form method="post" action="">
-                <?php wp_nonce_field('sifrbolt_autoload_action'); ?>
+                <?php wp_nonce_field($nonce_action); ?>
                 <input type="hidden" name="sifrbolt_autoload_action" value="import" />
                 <p>
                     <textarea name="autoload_payload" rows="6" style="width:100%;"></textarea>

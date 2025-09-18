@@ -6,9 +6,9 @@ namespace SifrBolt\Lite\Features;
 
 use wpdb;
 
-final class AutoloadInspector
+final class AutoloadInspectorReader
 {
-    private const NONCE_ACTION = 'sifrbolt_autoload_action';
+    public const NONCE_ACTION = 'sifrbolt_autoload_action';
 
     public function get_top_autoloads(int $limit = 20): array
     {
@@ -53,36 +53,28 @@ final class AutoloadInspector
             return;
         }
 
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
+            return;
+        }
+
         $action = sanitize_text_field($_POST['sifrbolt_autoload_action'] ?? '');
         if ($action === '') {
             return;
         }
 
+        if (! in_array($action, ['export', 'import'], true)) {
+            return;
+        }
+
         check_admin_referer(self::NONCE_ACTION);
 
-        switch ($action) {
-            case 'toggle':
-                $option = sanitize_text_field($_POST['option_name'] ?? '');
-                $autoload = sanitize_text_field($_POST['set_autoload'] ?? 'no');
-                if ($option !== '') {
-                    $this->set_autoload($option, $autoload === 'yes');
-                    add_settings_error('sifrbolt-autoload', 'autoload-updated', __('Autoload flag updated.', 'sifrbolt'), 'updated');
-                }
-                break;
-            case 'export':
-                $this->stream_backup();
-                break;
-            case 'import':
-                $payload = wp_unslash($_POST['autoload_payload'] ?? '');
-                $this->restore_from_json($payload);
-                break;
+        if ($action === 'export') {
+            $this->stream_backup();
+            return;
         }
-    }
 
-    private function set_autoload(string $option_name, bool $autoload): void
-    {
-        $value = get_option($option_name);
-        update_option($option_name, $value, $autoload);
+        $payload = wp_unslash($_POST['autoload_payload'] ?? '');
+        $this->restore_from_json($payload);
     }
 
     private function stream_backup(): void
@@ -145,7 +137,11 @@ final class AutoloadInspector
         add_settings_error(
             'sifrbolt-autoload',
             'autoload-import-complete',
-            sprintf( /* translators: %d: number of options restored */ __('Restored %d autoload options.', 'sifrbolt'), $imported ),
+            sprintf(
+                /* translators: %d: number of options restored */
+                __('Restored %d autoload options.', 'sifrbolt'),
+                $imported
+            ),
             'updated'
         );
     }

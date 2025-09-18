@@ -5,13 +5,15 @@ declare(strict_types=1);
 namespace SifrBolt\Lite\Infrastructure;
 
 use SifrBolt\Lite\Admin\AdminUi;
-use SifrBolt\Lite\Features\AutoloadInspector;
+use SifrBolt\Lite\Features\AutoloadInspectorReader;
+use SifrBolt\Lite\Features\AutoloadInspectorWriter;
 use SifrBolt\Lite\Features\CacheDropInManager;
 use SifrBolt\Lite\Features\CalmSwitch;
 use SifrBolt\Lite\Features\CronManager;
 use SifrBolt\Lite\Features\RedisAdvisor;
 use SifrBolt\Lite\Features\Telemetry;
 use SifrBolt\Lite\Features\TransientsJanitor;
+use SifrBolt\Lite\Infrastructure\License\LicenseFeatureResolver;
 
 final class Plugin
 {
@@ -32,7 +34,9 @@ final class Plugin
 
     private CalmSwitch $calm_switch;
 
-    private AutoloadInspector $autoload_inspector;
+    private AutoloadInspectorReader $autoload_reader;
+
+    private AutoloadInspectorWriter $autoload_writer;
 
     private TransientsJanitor $transients_janitor;
 
@@ -47,6 +51,8 @@ final class Plugin
     private string $plugin_file;
 
     private string $version;
+
+    private LicenseFeatureResolver $license_features;
 
     private function __construct(string $plugin_file, string $version)
     {
@@ -66,13 +72,16 @@ final class Plugin
 
         $this->calm_switch = new CalmSwitch();
         $this->cache_dropin = new CacheDropInManager($this->calm_switch);
-        $this->autoload_inspector = new AutoloadInspector();
+        $this->license_features = new LicenseFeatureResolver();
+        $this->autoload_reader = new AutoloadInspectorReader();
+        $this->autoload_writer = new AutoloadInspectorWriter($this->license_features);
         $this->transients_janitor = new TransientsJanitor();
         $this->cron_manager = new CronManager();
         $this->telemetry = new Telemetry($this->version);
         $this->redis_advisor = new RedisAdvisor();
         $this->admin_ui = new AdminUi(
-            $this->autoload_inspector,
+            $this->autoload_reader,
+            $this->autoload_writer,
             $this->transients_janitor,
             $this->cron_manager,
             $this->telemetry,
