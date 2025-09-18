@@ -110,6 +110,11 @@ final class AdminUi
                     </div>
                 <?php endforeach; ?>
             </div>
+            <?php if (has_action('sifrbolt/command_deck/widgets')) : ?>
+                <div class="sifrbolt-command-deck-widgets" style="margin-top:24px;display:flex;gap:16px;flex-wrap:wrap;">
+                    <?php do_action('sifrbolt/command_deck/widgets'); ?>
+                </div>
+            <?php endif; ?>
         </div>
         <?php
     }
