@@ -17,3 +17,8 @@ A lightweight WordPress command deck exposing core SifrBolt operational tooling:
 ## Development
 
 PHPCS baseline lives in `phpcs.xml.dist` and targets the WordPress Coding Standards.
+
+To lint locally:
+
+1. Install the toolchain with `composer install -d tools/phpcs --no-interaction --no-progress`.
+2. Run `tools/phpcs/vendor/bin/phpcs --standard=plugins/sifrbolt-lite/phpcs.xml.dist plugins/sifrbolt-lite`.
