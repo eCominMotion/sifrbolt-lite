@@ -19,6 +19,7 @@ use SifrBolt\Lite\Features\RedisAdvisor;
 use SifrBolt\Lite\Features\Telemetry;
 use SifrBolt\Lite\Features\TransientsJanitor;
 use SifrBolt\Lite\Infrastructure\License\LicenseFeatureResolver;
+use SifrBolt\Shared\Blueprints\Journal as BlueprintJournal;
 
 /**
  * Coordinates plugin bootstrapping and lifecycle hooks.
@@ -69,6 +70,8 @@ final class Plugin {
 
 	private AdminUi $admin_ui;
 
+	private BlueprintJournal $blueprint_journal;
+
 	private string $plugin_file;
 
 	private string $version;
@@ -106,6 +109,7 @@ final class Plugin {
 		$this->cron_manager       = new CronManager();
 		$this->telemetry          = new Telemetry( $this->version );
 		$this->redis_advisor      = new RedisAdvisor();
+		$this->blueprint_journal  = new BlueprintJournal();
 		$this->admin_ui           = new AdminUi(
 			$this->autoload_reader,
 			$this->autoload_writer,
@@ -113,7 +117,8 @@ final class Plugin {
 			$this->cron_manager,
 			$this->telemetry,
 			$this->calm_switch,
-			$this->redis_advisor
+			$this->redis_advisor,
+			$this->blueprint_journal
 		);
 	}
 

@@ -14,6 +14,8 @@ use SifrBolt\Lite\Features\AutoloadInspectorWriter;
 use SifrBolt\Lite\Features\CalmSwitch;
 use SifrBolt\Lite\Features\CronManager;
 use SifrBolt\Lite\Features\RedisAdvisor;
+use SifrBolt\Shared\Blueprints\Journal as BlueprintJournal;
+use SifrBolt\Shared\Blueprints\Library as BlueprintLibrary;
 use SifrBolt\Lite\Features\Telemetry;
 use SifrBolt\Lite\Features\TransientsJanitor;
 
@@ -40,7 +42,8 @@ final class AdminUi {
 		private readonly CronManager $cron_manager,
 		private readonly Telemetry $telemetry,
 		private readonly CalmSwitch $calm_switch,
-		private readonly RedisAdvisor $redis_advisor
+		private readonly RedisAdvisor $redis_advisor,
+		private readonly BlueprintJournal $blueprint_journal
 	) {
 	}
 
@@ -88,6 +91,7 @@ final class AdminUi {
 		add_action( 'admin_menu', array( $this, 'register_menu' ) );
 		add_action( 'admin_notices', array( $this, 'render_notices' ) );
 		add_action( 'admin_post_sifrbolt_calm_toggle', array( $this->calm_switch, 'handle_toggle' ) );
+		add_action( 'admin_post_sifrbolt_blueprint_rollback', array( $this, 'handle_blueprint_rollback' ) );
 	}
 
 	/**
@@ -106,6 +110,7 @@ final class AdminUi {
 		);
 
 		add_submenu_page( 'sifrbolt-command-deck', __( 'Command Deck', 'sifrbolt' ), __( 'Command Deck', 'sifrbolt' ), 'manage_options', 'sifrbolt-command-deck', array( $this, 'render_command_deck' ) );
+		add_submenu_page( 'sifrbolt-command-deck', __( 'Blueprints', 'sifrbolt' ), __( 'Blueprints', 'sifrbolt' ), 'manage_options', 'sifrbolt-blueprints', array( $this, 'render_blueprints' ) );
 		add_submenu_page( 'sifrbolt-command-deck', __( 'Runway', 'sifrbolt' ), __( 'Runway', 'sifrbolt' ), 'manage_options', 'sifrbolt-runway', array( $this, 'render_runway' ) );
 		add_submenu_page( 'sifrbolt-command-deck', __( 'Citadel Wall', 'sifrbolt' ), __( 'Citadel Wall', 'sifrbolt' ), 'manage_options', 'sifrbolt-citadel-wall', array( $this, 'render_citadel_wall' ) );
 		add_submenu_page( 'sifrbolt-command-deck', __( 'Black Box', 'sifrbolt' ), __( 'Black Box', 'sifrbolt' ), 'manage_options', 'sifrbolt-black-box', array( $this, 'render_black_box' ) );
@@ -122,6 +127,7 @@ final class AdminUi {
 		settings_errors( 'sifrbolt-autoload' );
 		settings_errors( 'sifrbolt-cron' );
 		settings_errors( 'sifrbolt-telemetry' );
+		settings_errors( 'sifrbolt-blueprint' );
 	}
 
 	/**
@@ -161,7 +167,148 @@ final class AdminUi {
 					<?php do_action( 'sifrbolt/command_deck/widgets' ); // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- Slash namespace keeps hooks scoped. ?>
 				</div>
 			<?php endif; ?>
+
+			<h2><?php esc_html_e( 'Blueprint Flight Log', 'sifrbolt' ); ?></h2>
+			<?php if ( empty( $blueprint_events ) ) : ?>
+				<p><?php esc_html_e( 'No blueprint activity recorded yet.', 'sifrbolt' ); ?></p>
+			<?php else : ?>
+				<table class="widefat striped" style="margin-top:12px;">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'When', 'sifrbolt' ); ?></th>
+							<th><?php esc_html_e( 'Mode', 'sifrbolt' ); ?></th>
+							<th><?php esc_html_e( 'Blueprint', 'sifrbolt' ); ?></th>
+							<th><?php esc_html_e( 'Operator', 'sifrbolt' ); ?></th>
+							<th><?php esc_html_e( 'Signature', 'sifrbolt' ); ?></th>
+							<th><?php esc_html_e( 'Actions', 'sifrbolt' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ( $blueprint_events as $entry ) :
+							$timestamp = isset( $entry['timestamp'] ) ? (int) $entry['timestamp'] : time();
+							$mode      = isset( $entry['mode'] ) ? (string) $entry['mode'] : 'unknown';
+							$rulepack  = isset( $entry['rulepack_id'] ) ? (string) $entry['rulepack_id'] : ''; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+							$version   = isset( $entry['version'] ) ? (string) $entry['version'] : '';
+							$signature = isset( $entry['signature'] ) ? (string) $entry['signature'] : '';
+							$signature_hint = $signature ? substr( $signature, 0, 16 ) . '…' : '';
+							$operator  = isset( $entry['operator'] ) ? (string) $entry['operator'] : __( 'system', 'sifrbolt' );
+							$allow_rollback = ( 'apply' === $mode && isset( $entry['id'] ) && ! isset( $rollback_index[ (string) $entry['id'] ] ) );
+						?>
+							<tr>
+								<td><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $timestamp ) ); ?></td>
+								<td><?php echo esc_html( ucfirst( $mode ) ); ?></td>
+								<td>
+									<strong><?php echo esc_html( $rulepack ?: __( 'Unknown', 'sifrbolt' ) ); ?></strong>
+									<?php if ( $version ) : ?>
+										<br /><?php printf( '<span style="opacity:0.7;">%s</span>', esc_html( sprintf( __( 'Version %s', 'sifrbolt' ), $version ) ) ); ?>
+									<?php endif; ?>
+								</td>
+								<td><?php echo esc_html( $operator ); ?></td>
+								<td><code><?php echo esc_html( $signature_hint ); ?></code></td>
+								<td>
+									<?php if ( $allow_rollback ) : ?>
+										<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+											<?php wp_nonce_field( 'sifrbolt_blueprint_rollback' ); ?>
+											<input type="hidden" name="action" value="sifrbolt_blueprint_rollback" />
+											<input type="hidden" name="event_id" value="<?php echo esc_attr( (string) $entry['id'] ); ?>" />
+											<button type="submit" class="button button-secondary"><?php esc_html_e( 'Record Rollback', 'sifrbolt' ); ?></button>
+										</form>
+									<?php elseif ( 'rollback' === $mode && ! empty( $entry['reference'] ) ) : ?>
+										<span style="opacity:0.75;"><?php printf( esc_html__( 'Rollback of %s', 'sifrbolt' ), esc_html( (string) $entry['reference'] ) ); ?></span>
+									<?php else : ?>
+										<span style="opacity:0.65;">—</span>
+									<?php endif; ?>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
 		</div>
+		<?php
+	}
+
+	/**
+	 * Outputs blueprint export details.
+	 *
+	 * @return void
+	 */
+	public function render_blueprints(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$blueprint   = BlueprintLibrary::storm_baseline();
+		$rulepack    = $blueprint['rulepack'];
+		$json        = BlueprintLibrary::storm_baseline_json();
+		$verifier    = BlueprintLibrary::verifying_key();
+		$signature   = $blueprint['signature'];
+		$signature_hint = substr( $signature, 0, 20 ) . '…';
+		?>
+		<div class="wrap sifrbolt-blueprints">
+			<h1><?php esc_html_e( 'Storm Blueprints', 'sifrbolt' ); ?></h1>
+			<p><?php esc_html_e( 'Blueprint exports are signed JSON documents that represent the active Storm fleet policy. Copy the payload below for offline distribution or to feed into Pack applies.', 'sifrbolt' ); ?></p>
+
+			<h2><?php echo esc_html( $rulepack['id'] ); ?></h2>
+			<table class="widefat striped" style="max-width:640px;margin-top:16px;">
+				<tbody>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Version', 'sifrbolt' ); ?></th>
+						<td><?php echo esc_html( $rulepack['version'] ); ?></td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Issued At', 'sifrbolt' ); ?></th>
+						<td><?php echo esc_html( $rulepack['created_at'] ); ?></td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'SHA-256', 'sifrbolt' ); ?></th>
+						<td><code><?php echo esc_html( $rulepack['sha256'] ); ?></code></td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Signature', 'sifrbolt' ); ?></th>
+						<td><code><?php echo esc_html( $signature_hint ); ?></code></td>
+					</tr>
+					<tr>
+						<th scope="row"><?php esc_html_e( 'Verifying Key', 'sifrbolt' ); ?></th>
+						<td><code><?php echo esc_html( $verifier ); ?></code></td>
+					</tr>
+				</tbody>
+			</table>
+
+			<h3 style="margin-top:24px;">JSON</h3>
+			<p><?php esc_html_e( 'Copy the signed blueprint JSON for CLI import or Pack applies.', 'sifrbolt' ); ?></p>
+			<textarea id="sifrbolt-blueprint-json" readonly rows="18" style="width:100%;font-family:monospace;"><?php echo esc_textarea( $json ); ?></textarea>
+			<p>
+				<button type="button" class="button button-primary" data-copy-target="#sifrbolt-blueprint-json"><?php esc_html_e( 'Copy Blueprint JSON', 'sifrbolt' ); ?></button>
+			</p>
+		</div>
+		<script>
+			(function () {
+				const container = document.querySelector('.sifrbolt-blueprints');
+				if (!container) {
+					return;
+				}
+				container.addEventListener('click', function (event) {
+					const target = event.target;
+					if (!(target instanceof HTMLButtonElement)) {
+						return;
+					}
+					const selector = target.getAttribute('data-copy-target');
+					if (!selector) {
+						return;
+					}
+					const textarea = container.querySelector(selector);
+					if (textarea instanceof HTMLTextAreaElement) {
+						textarea.select();
+						document.execCommand('copy');
+						target.textContent = '<?php echo esc_js( __( 'Copied!', 'sifrbolt' ) ); ?>';
+						setTimeout(function () {
+							target.textContent = '<?php echo esc_js( __( 'Copy Blueprint JSON', 'sifrbolt' ) ); ?>';
+						}, 1600);
+					}
+				});
+			})();
+		</script>
 		<?php
 	}
 
@@ -351,8 +498,15 @@ final class AdminUi {
 			return;
 		}
 
-		$enabled = $this->telemetry->is_enabled();
-		$buckets = $this->telemetry->get_bucket_snapshot();
+		$enabled          = $this->telemetry->is_enabled();
+		$buckets          = $this->telemetry->get_bucket_snapshot();
+		$blueprint_events = $this->blueprint_journal->recent();
+		$rollback_index   = array();
+		foreach ( $blueprint_events as $entry ) {
+			if ( isset( $entry['mode'], $entry['reference'] ) && 'rollback' === $entry['mode'] && $entry['reference'] ) {
+				$rollback_index[ (string) $entry['reference'] ] = true;
+			}
+		}
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Flight Recorder — Telemetry', 'sifrbolt' ); ?></h1>
@@ -392,5 +546,49 @@ final class AdminUi {
 			<?php endif; ?>
 		</div>
 		<?php
+	}
+
+	/**
+	 * Handles blueprint rollback requests posted from the Flight Recorder table.
+	 */
+	public function handle_blueprint_rollback(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Insufficient permissions to manage blueprints.', 'sifrbolt' ) );
+		}
+
+		check_admin_referer( 'sifrbolt_blueprint_rollback' );
+		$event_id = isset( $_POST['event_id'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['event_id'] ) ) : '';
+
+		if ( '' === $event_id ) {
+			add_settings_error( 'sifrbolt-blueprint', 'sifrbolt-blueprint', __( 'Missing blueprint reference for rollback.', 'sifrbolt' ), 'error' );
+		} else {
+			$operator = $this->current_operator_label();
+			$rollback = $this->blueprint_journal->record_rollback( $event_id, $operator );
+			if ( null === $rollback ) {
+				add_settings_error( 'sifrbolt-blueprint', 'sifrbolt-blueprint', __( 'Unable to locate the referenced blueprint event.', 'sifrbolt' ), 'error' );
+			} else {
+				add_settings_error( 'sifrbolt-blueprint', 'sifrbolt-blueprint', __( 'Rollback recorded in Flight Recorder.', 'sifrbolt' ), 'updated' );
+			}
+		}
+
+		wp_safe_redirect( admin_url( 'admin.php?page=sifrbolt-flight-recorder' ) );
+		exit;
+	}
+
+	/**
+	 * Derives a human-friendly operator label for log entries.
+	 */
+	private function current_operator_label(): string {
+		$user = wp_get_current_user();
+		if ( $user && $user->exists() ) {
+			if ( $user->user_email ) {
+				return (string) $user->user_email;
+			}
+			if ( $user->user_login ) {
+				return (string) $user->user_login;
+			}
+		}
+
+		return __( 'system', 'sifrbolt' );
 	}
 }
