@@ -150,6 +150,12 @@ final class AdminUi {
 					</div>
 				<?php endforeach; ?>
 			</div>
+			<div class="sifrbolt-upgrade-callouts" style="margin-top:24px;max-width:640px;">
+				<p style="margin:0;line-height:1.5;">
+					<strong><?php esc_html_e( 'New in Surge:', 'sifrbolt' ); ?></strong>
+					<?php esc_html_e( 'The JavaScript Scheduler now ships with an INP guard—non-critical scripts idle until the page hits a safe interaction window, while WooCommerce Cart and Checkout flows continue without delay.', 'sifrbolt' ); ?>
+				</p>
+			</div>
 			<?php if ( has_action( 'sifrbolt/command_deck/widgets' ) ) : // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- Slash namespace keeps hooks scoped. ?>
 				<div class="sifrbolt-command-deck-widgets" style="margin-top:24px;display:flex;gap:16px;flex-wrap:wrap;">
 					<?php do_action( 'sifrbolt/command_deck/widgets' ); // phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- Slash namespace keeps hooks scoped. ?>
