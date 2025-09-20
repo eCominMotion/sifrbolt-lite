@@ -34,6 +34,7 @@ final class AdminUi {
 	 * @param Telemetry               $telemetry Telemetry controller.
 	 * @param CalmSwitch              $calm_switch CalmSwitch feature toggle.
 	 * @param RedisAdvisor            $redis_advisor Redis guidance helper.
+	 * @param BlueprintJournal        $blueprint_journal Blueprint event log.
 	 */
 	public function __construct(
 		private readonly AutoloadInspectorReader $autoload_reader,
@@ -184,24 +185,28 @@ final class AdminUi {
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ( $blueprint_events as $entry ) :
-							$timestamp = isset( $entry['timestamp'] ) ? (int) $entry['timestamp'] : time();
-							$mode      = isset( $entry['mode'] ) ? (string) $entry['mode'] : 'unknown';
-							$rulepack  = isset( $entry['rulepack_id'] ) ? (string) $entry['rulepack_id'] : ''; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
-							$version   = isset( $entry['version'] ) ? (string) $entry['version'] : '';
-							$signature = isset( $entry['signature'] ) ? (string) $entry['signature'] : '';
+						<?php
+						foreach ( $blueprint_events as $entry ) :
+							$timestamp      = isset( $entry['timestamp'] ) ? (int) $entry['timestamp'] : time();
+							$mode           = isset( $entry['mode'] ) ? (string) $entry['mode'] : 'unknown';
+							$rulepack       = isset( $entry['rulepack_id'] ) ? (string) $entry['rulepack_id'] : ''; // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound
+							$version        = isset( $entry['version'] ) ? (string) $entry['version'] : '';
+							$signature      = isset( $entry['signature'] ) ? (string) $entry['signature'] : '';
 							$signature_hint = $signature ? substr( $signature, 0, 16 ) . '…' : '';
-							$operator  = isset( $entry['operator'] ) ? (string) $entry['operator'] : __( 'system', 'sifrbolt' );
+							$operator       = isset( $entry['operator'] ) ? (string) $entry['operator'] : __( 'system', 'sifrbolt' );
 							$allow_rollback = ( 'apply' === $mode && isset( $entry['id'] ) && ! isset( $rollback_index[ (string) $entry['id'] ] ) );
-						?>
+							?>
 							<tr>
 								<td><?php echo esc_html( date_i18n( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $timestamp ) ); ?></td>
 								<td><?php echo esc_html( ucfirst( $mode ) ); ?></td>
 								<td>
-									<strong><?php echo esc_html( $rulepack ?: __( 'Unknown', 'sifrbolt' ) ); ?></strong>
-									<?php if ( $version ) : ?>
-										<br /><?php printf( '<span style="opacity:0.7;">%s</span>', esc_html( sprintf( __( 'Version %s', 'sifrbolt' ), $version ) ) ); ?>
-									<?php endif; ?>
+				<strong><?php echo esc_html( $rulepack ? $rulepack : __( 'Unknown', 'sifrbolt' ) ); ?></strong>
+							<?php if ( $version ) : ?>
+								<?php
+								// translators: %s is the version of the blueprint that generated the event.
+								printf( '<br /><span style="opacity:0.7;">%s</span>', esc_html( sprintf( __( 'Version %s', 'sifrbolt' ), $version ) ) );
+								?>
+				<?php endif; ?>
 								</td>
 								<td><?php echo esc_html( $operator ); ?></td>
 								<td><code><?php echo esc_html( $signature_hint ); ?></code></td>
@@ -213,8 +218,13 @@ final class AdminUi {
 											<input type="hidden" name="event_id" value="<?php echo esc_attr( (string) $entry['id'] ); ?>" />
 											<button type="submit" class="button button-secondary"><?php esc_html_e( 'Record Rollback', 'sifrbolt' ); ?></button>
 										</form>
-									<?php elseif ( 'rollback' === $mode && ! empty( $entry['reference'] ) ) : ?>
-										<span style="opacity:0.75;"><?php printf( esc_html__( 'Rollback of %s', 'sifrbolt' ), esc_html( (string) $entry['reference'] ) ); ?></span>
+				<?php elseif ( 'rollback' === $mode && ! empty( $entry['reference'] ) ) : ?>
+					<span style="opacity:0.75;">
+						<?php
+						// translators: %s is the identifier of the blueprint event being rolled back.
+						printf( esc_html__( 'Rollback of %s', 'sifrbolt' ), esc_html( (string) $entry['reference'] ) );
+						?>
+					</span>
 									<?php else : ?>
 										<span style="opacity:0.65;">—</span>
 									<?php endif; ?>
@@ -238,11 +248,11 @@ final class AdminUi {
 			return;
 		}
 
-		$blueprint   = BlueprintLibrary::storm_baseline();
-		$rulepack    = $blueprint['rulepack'];
-		$json        = BlueprintLibrary::storm_baseline_json();
-		$verifier    = BlueprintLibrary::verifying_key();
-		$signature   = $blueprint['signature'];
+		$blueprint      = BlueprintLibrary::storm_baseline();
+		$rulepack       = $blueprint['rulepack'];
+		$json           = BlueprintLibrary::storm_baseline_json();
+		$verifier       = BlueprintLibrary::verifying_key();
+		$signature      = $blueprint['signature'];
 		$signature_hint = substr( $signature, 0, 20 ) . '…';
 		?>
 		<div class="wrap sifrbolt-blueprints">
@@ -365,7 +375,10 @@ final class AdminUi {
 				<input type="submit" class="button button-<?php echo $calm ? 'secondary' : 'primary'; ?>" value="<?php echo $calm ? esc_attr__( 'Disengage CalmSwitch', 'sifrbolt' ) : esc_attr__( 'Engage CalmSwitch', 'sifrbolt' ); ?>" />
 			</form>
 
-			<?php do_action( 'sifrbolt/runway/after_overview' ); ?>
+				<?php
+				// phpcs:ignore WordPress.NamingConventions.ValidHookName.UseUnderscores -- Namespaced hook keeps related callbacks grouped.
+				do_action( 'sifrbolt/runway/after_overview' );
+				?>
 		</div>
 		<?php
 	}

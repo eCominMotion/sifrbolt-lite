@@ -16,7 +16,7 @@ if ( ! \defined( 'ABSPATH' ) ) {
 spl_autoload_register(
 	static function ( string $class_name ): void {
 		$prefixes = array(
-			__NAMESPACE__ . '\\'    => __DIR__,
+			__NAMESPACE__ . '\\' => __DIR__,
 			'SifrBolt\\Shared\\' => dirname( __DIR__ ) . '/shared',
 		);
 
