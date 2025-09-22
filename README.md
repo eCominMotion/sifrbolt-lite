@@ -20,6 +20,6 @@ PHPCS baseline lives in `phpcs.xml.dist` and targets the WordPress Coding Standa
 
 To lint locally:
 
-1. Install the toolchain with `composer install -d tools/phpcs --no-interaction --no-progress`.
-2. Run `tools/phpcs/vendor/bin/phpcs --standard=plugins/sifrbolt-lite/phpcs.xml.dist plugins/sifrbolt-lite`.
-3. Auto-fix safe sniffs with `tools/phpcs/vendor/bin/phpcbf --standard=plugins/sifrbolt-lite/phpcs.xml.dist plugins/sifrbolt-lite`.
+1. Install PHPCS (for example `composer global require squizlabs/php_codesniffer` or `brew install php-code-sniffer`).
+2. From the plugin root run `phpcs --standard=phpcs.xml.dist .`.
+3. To auto-fix safe sniffs run `phpcbf --standard=phpcs.xml.dist .`.
