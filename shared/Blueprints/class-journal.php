@@ -1,11 +1,10 @@
 <?php
-// phpcs:ignoreFile WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName
-
 /**
  * Lightweight blueprint journal placeholder for Spark tier.
  *
  * @package SifrBolt\Shared\Blueprints
  */
+
 declare(strict_types=1);
 
 namespace SifrBolt\Shared\Blueprints;

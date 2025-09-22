@@ -25,14 +25,41 @@ spl_autoload_register(
 				continue;
 			}
 
-			$relative      = substr( $class_name, strlen( $prefix ) );
-			$relative_path = str_replace( '\\', DIRECTORY_SEPARATOR, $relative );
-			$path          = $base_dir . DIRECTORY_SEPARATOR . $relative_path . '.php';
+			$relative = substr( $class_name, strlen( $prefix ) );
+			$segments = explode( '\\', $relative );
+			$class    = array_pop( $segments );
+			$subdir   = empty( $segments ) ? '' : implode( DIRECTORY_SEPARATOR, $segments ) . DIRECTORY_SEPARATOR;
 
-			if ( file_exists( $path ) ) {
-				require_once $path;
+			$filename_variants = array(
+				$subdir . $class . '.php',
+				$subdir . strtolower( $class ) . '.php',
+				$subdir . 'class-' . to_kebab_case( $class ) . '.php',
+			);
+
+			foreach ( $filename_variants as $relative_path ) {
+				$path = $base_dir . DIRECTORY_SEPARATOR . $relative_path;
+				if ( file_exists( $path ) ) {
+					require_once $path;
+					return;
+				}
 			}
 			return;
 		}
 	}
 );
+
+/**
+ * Converts a CamelCase class name into kebab-case.
+ *
+ * @param string $class_name Class segment to convert.
+ *
+ * @return string Kebab case slug.
+ */
+function to_kebab_case( string $class_name ): string {
+	$with_hyphen = preg_replace( '/(?<!^)[A-Z]/', '-$0', $class_name );
+	if ( ! is_string( $with_hyphen ) ) {
+		return strtolower( $class_name );
+	}
+
+	return strtolower( $with_hyphen );
+}

@@ -1,11 +1,10 @@
 <?php
-// phpcs:ignoreFile WordPress.Files.FileName.NotHyphenatedLowercase,WordPress.Files.FileName.InvalidClassFileName
-
 /**
  * Lightweight blueprint library placeholder for Spark tier.
  *
  * @package SifrBolt\Shared\Blueprints
  */
+
 declare(strict_types=1);
 
 namespace SifrBolt\Shared\Blueprints;
@@ -42,25 +41,13 @@ final class Library {
 	public static function storm_baseline_json(): string {
 		$data = self::storm_baseline();
 
-		if ( function_exists( 'wp_json_encode' ) ) {
-			$json = wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
-		} else {
-			$json = self::fallback_json_encode( $data );
+		if ( ! function_exists( 'wp_json_encode' ) ) {
+			return '{}';
 		}
 
-		return is_string( $json ) ? $json : '{}';
-	}
+		$json = wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
 
-	/**
-	 * Fallback encoder when WordPress helper is unavailable.
-	 *
-	 * @param array<string, mixed> $data Data to be encoded.
-	 *
-	 * @return string|false
-	 */
-	private static function fallback_json_encode( array $data ) {
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.json_encode_json_encode -- Used only outside WP bootstrap.
-		return json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES );
+		return is_string( $json ) ? $json : '{}';
 	}
 
 	/**
