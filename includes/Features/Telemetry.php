@@ -237,11 +237,19 @@ final class Telemetry {
 			return array();
 		}
 
-		return array(
+		$cluster = \SifrBolt\Lite\Telemetry\EdgePopResolver::resolve( $_SERVER );
+
+		$payload = array(
 			'site'      => home_url(),
 			'version'   => $this->version,
 			'metrics'   => $buckets,
 			'timestamp' => time(),
 		);
+
+		if ( null !== $cluster ) {
+			$payload['edge_cluster'] = $cluster;
+		}
+
+		return $payload;
 	}
 }
