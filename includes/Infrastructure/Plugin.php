@@ -117,6 +117,7 @@ final class Plugin {
 			$this->cron_manager,
 			$this->telemetry,
 			$this->calm_switch,
+			$this->cache_dropin,
 			$this->redis_advisor,
 			$this->blueprint_journal
 		);
@@ -128,6 +129,8 @@ final class Plugin {
 	 * @return void
 	 */
 	private function register_hooks(): void {
+		$this->cache_dropin->register();
+
 		register_activation_hook( $this->plugin_file, array( $this, 'on_activate' ) );
 		register_deactivation_hook( $this->plugin_file, array( $this, 'on_deactivate' ) );
 
@@ -143,7 +146,7 @@ final class Plugin {
 	 */
 	public function on_activate(): void {
 		$this->calm_switch->ensure_config_file();
-		$this->cache_dropin->install();
+		$this->cache_dropin->maybe_refresh();
 		$this->transients_janitor->ensure_schedule();
 		$this->cron_manager->ensure_directory();
 	}

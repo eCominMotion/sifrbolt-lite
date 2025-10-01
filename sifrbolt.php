@@ -3,7 +3,7 @@
  * Plugin Name: SifrBolt — Spark
  * Plugin URI: https://sifrbolt.com
  * Description: WordPress command deck for SifrBolt — Spark features.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Author: SifrBolt
  * Author URI: https://sifrbolt.com
  * License: GPL-2.0-or-later
@@ -25,7 +25,7 @@ if ( ! \defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 
 require_once __DIR__ . '/includes/autoload.php';
 

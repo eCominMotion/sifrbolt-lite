@@ -16,6 +16,10 @@ final class CacheDropInManager {
 
 	private const DROPIN_PATH = 'advanced-cache.php';
 	private const SIGNATURE   = 'SIFRBOLT_SPARK_LITE_DROPIN v1';
+	private const OPTION_KEY  = 'sifrbolt_lite_dropin';
+	private const OPTION_FLAG = 'enabled';
+	private const NONCE       = 'sifrbolt_dropin_toggle';
+	private const ACTION      = 'sifrbolt_toggle_dropin';
 
 	/**
 	 * Sets dependencies.
@@ -26,21 +30,102 @@ final class CacheDropInManager {
 	}
 
 	/**
-	 * Installs and refreshes the drop-in.
+	 * Registers admin post handlers.
 	 *
 	 * @return void
 	 */
-	public function install(): void {
-		$this->calm_switch->ensure_config_file();
-		$this->maybe_refresh();
+	public function register(): void {
+		add_action( 'admin_post_' . self::ACTION, array( $this, 'handle_toggle' ) );
 	}
 
 	/**
-	 * Refreshes the drop-in when stale or missing signature.
+	 * Returns the nonce action for toggling the drop-in.
+	 *
+	 * @return string
+	 */
+	public function get_nonce_action(): string {
+		return self::NONCE;
+	}
+
+	/**
+	 * Determines whether the drop-in is enabled.
+	 *
+	 * @return bool
+	 */
+	public function is_enabled(): bool {
+		$settings = (array) get_option( self::OPTION_KEY, array( self::OPTION_FLAG => false ) );
+		return (bool) ( $settings[ self::OPTION_FLAG ] ?? false );
+	}
+
+	/**
+	 * Enables the drop-in by writing it to disk.
+	 *
+	 * @return bool True when the drop-in was written successfully.
+	 */
+	public function install(): bool {
+		$this->calm_switch->ensure_config_file();
+		$template = $this->get_composed_dropin();
+		$target   = $this->get_dropin_path();
+		$success  = $this->write_dropin( $template, $target );
+
+		if ( $success ) {
+			update_option( self::OPTION_KEY, array( self::OPTION_FLAG => true ), true );
+		}
+
+		return $success;
+	}
+
+	/**
+	 * Disables the drop-in and updates stored state.
+	 *
+	 * @return void
+	 */
+	public function disable(): void {
+		$this->remove_dropin();
+		update_option( self::OPTION_KEY, array( self::OPTION_FLAG => false ), true );
+	}
+
+	/**
+	 * Handles the admin toggle request for the drop-in.
+	 *
+	 * @return void
+	 */
+	public function handle_toggle(): void {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have permission to manage the cache drop-in.', 'sifrbolt' ) );
+		}
+
+		check_admin_referer( self::NONCE );
+		$enable = isset( $_POST['enable_cache_dropin'] ) && '1' === $_POST['enable_cache_dropin']; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- Request validated via check_admin_referer().
+
+		if ( $enable ) {
+			$success = $this->install();
+			if ( $success ) {
+				add_settings_error( 'sifrbolt-dropin', 'dropin-enabled', esc_html__( 'Page cache drop-in enabled.', 'sifrbolt' ), 'updated' );
+			} else {
+				update_option( self::OPTION_KEY, array( self::OPTION_FLAG => false ), true );
+				add_settings_error( 'sifrbolt-dropin', 'dropin-error', esc_html__( 'Failed to write the page cache drop-in. Check file permissions.', 'sifrbolt' ), 'error' );
+			}
+		} else {
+			$this->disable();
+			add_settings_error( 'sifrbolt-dropin', 'dropin-disabled', esc_html__( 'Page cache drop-in disabled.', 'sifrbolt' ), 'updated' );
+		}
+
+		wp_safe_redirect( add_query_arg( array( 'page' => 'sifrbolt-runway' ), admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/**
+	 * Installs and refreshes the drop-in if enabled.
 	 *
 	 * @return void
 	 */
 	public function maybe_refresh(): void {
+		if ( ! $this->is_enabled() ) {
+			$this->remove_dropin();
+			return;
+		}
+
 		$template = $this->get_composed_dropin();
 		$target   = $this->get_dropin_path();
 
@@ -65,11 +150,7 @@ final class CacheDropInManager {
 	 * @return void
 	 */
 	public function maybe_remove_on_deactivate(): void {
-		$target        = $this->get_dropin_path();
-		$target_exists = file_exists( $target ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_exists -- Drop-in management requires filesystem checks.
-		if ( $target_exists && str_contains( (string) file_get_contents( $target ), self::SIGNATURE ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Drop-in managed before WP_Filesystem.
-			unlink( $target ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- Drop-in removal uses direct filesystem operations.
-		}
+		$this->remove_dropin();
 	}
 
 	/**
@@ -77,7 +158,7 @@ final class CacheDropInManager {
 	 *
 	 * @return string
 	 */
-	private function get_dropin_path(): string {
+	public function get_dropin_path(): string {
 		return WP_CONTENT_DIR . '/' . self::DROPIN_PATH;
 	}
 
@@ -107,19 +188,37 @@ final class CacheDropInManager {
 	 * @param string $contents Drop-in contents.
 	 * @param string $target   Destination path.
 	 *
-	 * @return void
+	 * @return bool True when the drop-in was written.
 	 */
-	private function write_dropin( string $contents, string $target ): void {
+	private function write_dropin( string $contents, string $target ): bool {
 		if ( ! is_dir( WP_CONTENT_DIR ) ) {
-			return;
+			return false;
 		}
 
 		$bytes = file_put_contents( $target, $contents, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Drop-in must be written before WP_Filesystem APIs.
 		if ( false === $bytes ) {
 			error_log( '[sifrbolt-lite] Failed to write advanced-cache drop-in.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Log failure to aid troubleshooting.
-			return;
+			return false;
 		}
 
 		@chmod( $target, 0644 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_chmod -- Maintain drop-in permissions without depending on WP_Filesystem.
+		return true;
+	}
+
+	/**
+	 * Removes the managed drop-in if present.
+	 *
+	 * @return void
+	 */
+	private function remove_dropin(): void {
+		$target = $this->get_dropin_path();
+		if ( ! file_exists( $target ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_exists -- Drop-in management requires filesystem checks.
+			return;
+		}
+
+		$contents = (string) file_get_contents( $target ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Drop-in managed before WP_Filesystem.
+		if ( str_contains( $contents, self::SIGNATURE ) ) {
+			unlink( $target ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink -- Drop-in removal uses direct filesystem operations.
+		}
 	}
 }

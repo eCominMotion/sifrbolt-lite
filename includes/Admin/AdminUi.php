@@ -12,6 +12,7 @@ namespace SifrBolt\Lite\Admin;
 use SifrBolt\Lite\Features\AutoloadInspectorReader;
 use SifrBolt\Lite\Features\AutoloadInspectorWriter;
 use SifrBolt\Lite\Features\CalmSwitch;
+use SifrBolt\Lite\Features\CacheDropInManager;
 use SifrBolt\Lite\Features\CronManager;
 use SifrBolt\Lite\Features\RedisAdvisor;
 use SifrBolt\Shared\Blueprints\Journal as BlueprintJournal;
@@ -33,6 +34,7 @@ final class AdminUi {
 	 * @param CronManager             $cron_manager Cron bridge service.
 	 * @param Telemetry               $telemetry Telemetry controller.
 	 * @param CalmSwitch              $calm_switch CalmSwitch feature toggle.
+	 * @param CacheDropInManager      $cache_dropin Cache drop-in controller.
 	 * @param RedisAdvisor            $redis_advisor Redis guidance helper.
 	 * @param BlueprintJournal        $blueprint_journal Blueprint event log.
 	 */
@@ -43,6 +45,7 @@ final class AdminUi {
 		private readonly CronManager $cron_manager,
 		private readonly Telemetry $telemetry,
 		private readonly CalmSwitch $calm_switch,
+		private readonly CacheDropInManager $cache_dropin,
 		private readonly RedisAdvisor $redis_advisor,
 		private readonly BlueprintJournal $blueprint_journal
 	) {
@@ -126,6 +129,7 @@ final class AdminUi {
 	public function render_notices(): void {
 		settings_errors( 'sifrbolt-calm' );
 		settings_errors( 'sifrbolt-autoload' );
+		settings_errors( 'sifrbolt-dropin' );
 		settings_errors( 'sifrbolt-cron' );
 		settings_errors( 'sifrbolt-telemetry' );
 		settings_errors( 'sifrbolt-blueprint' );
@@ -332,10 +336,11 @@ final class AdminUi {
 			return;
 		}
 
-		$calm          = $this->calm_switch->is_calm();
-		$dropin_path   = WP_CONTENT_DIR . '/advanced-cache.php';
-		$dropin_exists = file_exists( $dropin_path );
-		$redis         = $this->redis_advisor->detect();
+		$calm           = $this->calm_switch->is_calm();
+		$dropin_path    = WP_CONTENT_DIR . '/advanced-cache.php';
+		$dropin_exists  = file_exists( $dropin_path );
+		$dropin_enabled = $this->cache_dropin->is_enabled();
+		$redis          = $this->redis_advisor->detect();
 		?>
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Runway', 'sifrbolt' ); ?></h1>
@@ -345,7 +350,10 @@ final class AdminUi {
 					<tr>
 						<th><?php esc_html_e( 'Page Cache Drop-in', 'sifrbolt' ); ?></th>
 						<td>
-							<?php echo $dropin_exists ? esc_html__( 'Installed', 'sifrbolt' ) : esc_html__( 'Missing', 'sifrbolt' ); ?>
+							<?php echo $dropin_enabled ? esc_html__( 'Enabled', 'sifrbolt' ) : esc_html__( 'Disabled', 'sifrbolt' ); ?>
+							<span style="margin-left:8px;opacity:0.75;">
+								<?php echo $dropin_exists ? esc_html__( 'File present', 'sifrbolt' ) : esc_html__( 'File missing', 'sifrbolt' ); ?>
+							</span>
 							<code><?php echo esc_html( $dropin_path ); ?></code>
 						</td>
 					</tr>
@@ -373,6 +381,16 @@ final class AdminUi {
 				<?php wp_nonce_field( $this->calm_switch->get_nonce_action() ); ?>
 				<input type="hidden" name="action" value="sifrbolt_calm_toggle" />
 				<input type="submit" class="button button-<?php echo $calm ? 'secondary' : 'primary'; ?>" value="<?php echo $calm ? esc_attr__( 'Disengage CalmSwitch', 'sifrbolt' ) : esc_attr__( 'Engage CalmSwitch', 'sifrbolt' ); ?>" />
+			</form>
+
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:12px;max-width:640px;">
+				<?php wp_nonce_field( $this->cache_dropin->get_nonce_action() ); ?>
+				<input type="hidden" name="action" value="sifrbolt_toggle_dropin" />
+				<input type="hidden" name="enable_cache_dropin" value="<?php echo $dropin_enabled ? '0' : '1'; ?>" />
+				<p style="margin-bottom:8px;">
+					<?php esc_html_e( 'When enabled, SifrBolt manages wp-content/advanced-cache.php as an opt-in page cache layer.', 'sifrbolt' ); ?>
+				</p>
+				<input type="submit" class="button button-<?php echo $dropin_enabled ? 'secondary' : 'primary'; ?>" value="<?php echo $dropin_enabled ? esc_attr__( 'Disable Page Cache Drop-in', 'sifrbolt' ) : esc_attr__( 'Enable Page Cache Drop-in', 'sifrbolt' ); ?>" />
 			</form>
 
 				<?php
